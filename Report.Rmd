@@ -1,0 +1,91 @@
+---
+title: "Reproducible Research - Assessment 1"
+author: "José Miguel Reséndiz"
+date: "Tuesday, February 10, 2015"
+output: pdf_document
+---
+
+##INTRODUCCTION
+
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a [Fitbit](http://www.fitbit.com/mx), [Nike Fuelband](http://www.nike.com/us/en_us/c/nikeplus-fuelband), or [Jawbone Up](https://jawbone.com/intl/up). These type of devices are part of the "quantified self" movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks.
+But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+##Data
+The data for this assignment can be downloaded from the course web site:
+
+
+Dataset: [Activity monitoring data [52K]](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
+
+
+The variables included in this dataset are:
+
+
+**steps:** Number of steps taking in a 5-minute interval (missing values are
+coded as NA)
+
+
+**date:** The date on which the measurement was taken in YYYY-MM-DD
+format
+
+
+·**interval:** Identifier for the 5-minute interval in which measurement was
+taken
+
+
+The dataset is stored in a comma-separated-value (CSV) file and there are a
+total of 17,568 observations in this dataset.
+
+## GETING & CLEANING DATA
+
+###1.- LOAD DATA
+Load Data
+```{r simulation}
+dataPerMov<-read.csv("activity.csv")
+```
+Raw Data
+```{r,echo=FALSE}
+head(dataPerMov)
+```
+Structure
+```{r,echo=FALSE}
+str(dataPerMov)
+```
+
+
+###2.- Process/transform the data
+We select only the rows with values different of NA, and tranform field 'date' to POSIXlt
+```{r simulatio}
+dataPerMov<-na.omit(dataPerMov)
+dataPerMov$date <- as.POSIXlt(dataPerMov$date)
+```
+Output
+```{r,echo=FALSE}
+head(dataPerMov)
+```
+
+##EXPLORATORY DATA ANALYSI
+
+###1.- What is mean total number of steps taken per day?
+
+``` {r,echo=FALSE,fig.width=8, fig.height=8 }
+dataPerMov<-read.csv("activity.csv")
+dataPerMov<-na.omit(dataPerMov)
+stepsForDay<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=sum)
+
+library(ggplot2)
+ggplot(stepsForDay, aes(x=date, y=x)) + geom_bar(stat="identity") + 
+  labs(x="Dates", y="Stpes") + 
+  coord_flip()
+```
+
+
+``` {r,echo=FALSE,results='asis',fig.align='center'}
+dataPerMov<-read.csv("activity.csv")
+dataPerMov<-na.omit(dataPerMov)
+stepsForDay<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=mean)
+library("xtable")
+stepsForDay<- xtable(stepsForDay)
+
+print(stepsForDay,type="html")
+```
+
