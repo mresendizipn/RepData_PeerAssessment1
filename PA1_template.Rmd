@@ -1,41 +1,384 @@
+--
+title: "Reproducible Research - Assessment 1"
+author: "José Miguel Reséndiz"
+date: "Tuesday, February 10, 2015"
+output: html_document
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+
+##INTRODUCCTION
+
+  It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a [Fitbit](http://www.fitbit.com/mx), [Nike Fuelband](http://www.nike.com/us/en_us/c/nikeplus-fuelband), or [Jawbone Up](https://jawbone.com/intl/up). These type of devices are part of the "quantified self" movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks.
+  But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+##Data
+The data for this assignment can be downloaded from the course web site:
 
 
+Dataset: [Activity monitoring data [52K]](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
 
 
-```{r}
-summary(cars)
+The variables included in this dataset are:
+
+
+**steps:** Number of steps taking in a 5-minute interval (missing values are coded as NA)
+
+
+**date:** The date on which the measurement was taken in YYYY-MM-DD format
+
+
+**interval:** Identifier for the 5-minute interval in which measurement was taken
+
+
+The dataset is stored in a comma-separated-value (CSV) file and there are a
+total of 17,568 observations in this dataset.
+
+###LOADING AND PROCESSING THE DATA
+
+Load Data
+```{r simulation}
+dataPerMov<-read.csv("activity.csv")
+```
+Raw Data
+```{r,echo=FALSE}
+head(dataPerMov)
+```
+Structure
+```{r,echo=FALSE}
+str(dataPerMov)
 ```
 
-You can also embed plots, for example:
-
-```{r, echo=FALSE}
-plot(cars)
+Select only the rows with values different of NA.
+```{r simulatio}
+library(stringr)
+dataPerMov<-read.csv("activity.csv")
+dataPerMov<-na.omit(dataPerMov)
+dataPerMov <- data.frame(date = dataPerMov$date,  interval = dataPerMov$interval, steps = dataPerMov$steps)
+head(dataPerMov)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+###What is mean total number of steps taken per day?
+
+Histogram of the total number of steps taken each day
+``` {r,echo=FALSE,fig.width=8, fig.height=8 }
+library(stringr)
+library(ggplot2)
+dataPerMov<-read.csv("activity.csv")
+dataPerMov<-na.omit(dataPerMov)
+dataPerMov <- data.frame(date = dataPerMov$date, interval = dataPerMov$interval, steps = dataPerMov$steps)
+stepsForDay<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=sum)
+ggplot(stepsForDay, aes(x=date, y=x)) + geom_bar(stat="identity") + 
+  labs(x="Dates", y="Stpes") + 
+  coord_flip()
+```
+
+Mean and median total number of steps taken per day
+```{r,echo=FALSE}
+library(stringr)
+dataPerMov<-read.csv("activity.csv")
+dataPerMov<-na.omit(dataPerMov)
+dataPerMov <- data.frame(date = dataPerMov$date,interval = dataPerMov$interval, steps = dataPerMov$steps)
+
+stepsForDayMean<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=mean)
+stepsForDayMedian<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=median)$x
+dataPerMov <- data.frame(DATE = stepsForDayMean$date,MEAN_STEP = stepsForDayMean$x,MEDIAN_STEP=stepsForDayMedian)
+dataPerMov
+```
+
+###What is the average daily activity pattern?
+Series of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+``` {r,echo=FALSE,fig.width=11, fig.height=4 }
+library(ggplot2)
+library(stringr)
+dataPerMov<-read.csv("activity.csv")
+dataPerMov<-na.omit(dataPerMov)
+dataPerMov <- data.frame(date = dataPerMov$date, interval = dataPerMov$interval, steps = dataPerMov$steps)
+stepsForInterval<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$interval), FUN=mean)
+interval <- substr(as.character(seq(as.POSIXct("2015-02-12 00:00:00 CST"), as.POSIXct("2015-02-12 23:55:00 CST"), by = "hours")),12,16)
+names(stepsForInterval) <- c("INTERVAL","AVERAGE_STEPS")
+longuitud <- nrow(stepsForInterval) -1
+longuitudInterval <- length(interval)
+ggplot(stepsForInterval, aes(0:longuitud, AVERAGE_STEPS)) + geom_line() +
+ scale_x_continuous(name="time" ,  breaks=seq(0,longuitud,length.out=longuitudInterval), labels=interval)
+```
+
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r,echo=FALSE}
+dataPerMov<-read.csv("activity.csv")
+dataPerMov<-na.omit(dataPerMov)
+numRow<-nrow(dataPerMov)
+stepsForDayMean<- aggregate(dataPerMov$steps, by=list(interval=dataPerMov$interval), FUN=mean)
+dataPerMov <- data.frame(INTERVAL = stepsForDayMean$interval,MEAN_STEP = stepsForDayMean$x)
+
+stepsForInterval<-dataPerMov[max(dataPerMov$MEAN_STEP) == dataPerMov$MEAN_STEP,]
+stepsForInterval
+```
 
 
-
-## Loading and preprocessing the data
-
+###IMPUTING MISSING VALUES
 
 
-## What is mean total number of steps taken per day?
+Number of NA rows  
+```{r,echo=TRUE}
+dataPerMov<-read.csv("activity.csv")
+nrow(dataPerMov[is.na(dataPerMov$steps),])
+```
+
+Filling in all of the missing values in the dataset.We use the mean for that day and 5-minute interval
+```{r,echo=TRUE}
+#Prepare Data
+dataPerMovRaw<-read.csv("activity.csv")
+auxData <- cbind(dataPerMovRaw,wday = as.POSIXlt(dataPerMovRaw$date)$wday)
+dataPerMov<-auxData[!is.na(auxData$steps),]
+dataPerMovNA <-auxData[is.na(auxData$steps),]
+
+#Calculating of mean by interval and week day for the values NA
+dataPerMovMean<- aggregate(dataPerMov$steps, by=list(interval=dataPerMov$interval, wday=dataPerMov$wday), FUN=mean)
+names(dataPerMovMean) <- c("interval","wday","mean")
+
+#Building final data set
+tempAux <- merge(dataPerMovNA,dataPerMovMean)
+dataPerMovNA <- data.frame(steps = tempAux$mean, date = tempAux$date, interval = tempAux$interval, wday = tempAux$wday)
+finalDataSet <- rbind(dataPerMovNA,dataPerMov)
+head(finalDataSet)
+```
+
+Output
+``` {r,echo=FALSE,fig.width=11, fig.height=4 }
+library(ggplot2)
+library(stringr)
+
+#Load data
+dataPerMovRaw<-read.csv("activity.csv")
+auxData <- cbind(dataPerMovRaw,wday = as.POSIXlt(dataPerMovRaw$date)$wday)
+dataPerMov<-auxData[!is.na(auxData$steps),]
+dataPerMovNA <-auxData[is.na(auxData$steps),]
+
+#Calculation mean by interval and week day for the values NA
+dataPerMovMean<- aggregate(dataPerMov$steps, by=list(interval=dataPerMov$interval, wday=dataPerMov$wday), FUN=mean)
+names(dataPerMovMean) <- c("interval","wday","mean")
+
+#Building final data set
+tempAux <- merge(dataPerMovNA,dataPerMovMean)
+dataPerMovNA <- data.frame(steps = tempAux$mean, date = tempAux$date, interval = tempAux$interval, wday = tempAux$wday)
+finalDataSet <- rbind(dataPerMovNA,dataPerMov)
+
+#Make Plot
+dataPerMov<-finalDataSet
+dataPerMov <- data.frame(date = dataPerMov$date, interval = dataPerMov$interval, steps = dataPerMov$steps)
+stepsForInterval<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$interval), FUN=mean)
+interval <- substr(as.character(seq(as.POSIXct("2015-02-12 00:00:00 CST"), as.POSIXct("2015-02-12 23:55:00 CST"), by = "hours")),12,16)
+names(stepsForInterval) <- c("INTERVAL","AVERAGE_STEPS")
+longuitud <- nrow(stepsForInterval) -1
+longuitudInterval <- length(interval)
+ggplot(stepsForInterval, aes(0:longuitud, AVERAGE_STEPS)) + geom_line() +
+  scale_x_continuous(name="time" ,  breaks=seq(0,longuitud,length.out=longuitudInterval), labels=interval)
+```
+
+###Mean and median total number of steps taken per day
+```{r,echo=FALSE}
+#Load data
+dataPerMovRaw<-read.csv("activity.csv")
+auxData <- cbind(dataPerMovRaw,wday = as.POSIXlt(dataPerMovRaw$date)$wday)
+dataPerMov<-auxData[!is.na(auxData$steps),]
+dataPerMovNA <-auxData[is.na(auxData$steps),]
+
+#Calculation mean by interval and week day for the values NA
+dataPerMovMean<- aggregate(dataPerMov$steps, by=list(interval=dataPerMov$interval, wday=dataPerMov$wday), FUN=mean)
+names(dataPerMovMean) <- c("interval","wday","mean")
+
+#Building final data set
+tempAux <- merge(dataPerMovNA,dataPerMovMean)
+dataPerMovNA <- data.frame(steps = tempAux$mean, date = tempAux$date, interval = tempAux$interval, wday = tempAux$wday)
+finalDataSet <- rbind(dataPerMovNA,dataPerMov)
+
+dataPerMov <-finalDataSet
+
+stepsForDayMean<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=mean)
+stepsForDayMedian<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=median)$x
+dataPerMov <- data.frame(DATE = stepsForDayMean$date,MEAN_STEP = stepsForDayMean$x,MEDIAN_STEP=stepsForDayMedian)
+dataPerMov
+```
 
 
+###Do these values differ from the estimates from the first part of the assignment?
+```{r,echo=FALSE}
+#####################################################################
+#######CALCULATE VALUES NA
+#####################################################################
 
-## What is the average daily activity pattern?
+#Load data
+dataPerMovRaw<-read.csv("activity.csv")
+auxData <- cbind(dataPerMovRaw,wday = as.POSIXlt(dataPerMovRaw$date)$wday)
+dataPerMov<-auxData[!is.na(auxData$steps),]
+dataPerMovNA <-auxData[is.na(auxData$steps),]
+
+#Calculation mean by interval and week day for the values NA
+dataPerMovMean<- aggregate(dataPerMov$steps, by=list(interval=dataPerMov$interval, wday=dataPerMov$wday), FUN=mean)
+names(dataPerMovMean) <- c("interval","wday","mean")
+
+#Building final data set
+tempAux <- merge(dataPerMovNA,dataPerMovMean)
+dataPerMovNA <- data.frame(steps = tempAux$mean, date = tempAux$date, interval = tempAux$interval, wday = tempAux$wday)
+finalDataSet <- rbind(dataPerMovNA,dataPerMov)
+dataPerMov <-finalDataSet
+stepsForDayMean<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=mean)
+stepsForDayMedian<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=median)$x
+dataPerMovNA <- data.frame(DATE = stepsForDayMean$date,MEAN_STEP_NA = stepsForDayMean$x,MEDIAN_STEP_NA=stepsForDayMedian)
+
+#####################################################################
+#######CALCULATE
+#####################################################################
+library(stringr)
+dataPerMov<-read.csv("activity.csv")
+dataPerMov<-na.omit(dataPerMov)
+dataPerMov <- data.frame(date = dataPerMov$date,interval = dataPerMov$interval, steps = dataPerMov$steps)
+
+stepsForDayMean<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=mean)
+stepsForDayMedian<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=median)$x
+dataPerMov <- data.frame(DATE = stepsForDayMean$date,MEAN_STEP = stepsForDayMean$x,MEDIAN_STEP=stepsForDayMedian)
+
+merge(dataPerMovNA,dataPerMov)
 
 
+```
 
-## Imputing missing values
+####What is the impact of imputing missing data on the estimates of the total daily number of steps?
+There´re some rows with any value, but this reason, we cant't calculat a value.
+```{r,echo=FALSE}
+#####################################################################
+#######CALCULATE VALUES NA
+#####################################################################
+
+#Load data
+dataPerMovRaw<-read.csv("activity.csv")
+auxData <- cbind(dataPerMovRaw,wday = as.POSIXlt(dataPerMovRaw$date)$wday)
+dataPerMov<-auxData[!is.na(auxData$steps),]
+dataPerMovNA <-auxData[is.na(auxData$steps),]
+
+#Calculation mean by interval and week day for the values NA
+dataPerMovMean<- aggregate(dataPerMov$steps, by=list(interval=dataPerMov$interval, wday=dataPerMov$wday), FUN=mean)
+names(dataPerMovMean) <- c("interval","wday","mean")
+
+#Building final data set
+tempAux <- merge(dataPerMovNA,dataPerMovMean)
+dataPerMovNA <- data.frame(steps = tempAux$mean, date = tempAux$date, interval = tempAux$interval, wday = tempAux$wday)
+finalDataSet <- rbind(dataPerMovNA,dataPerMov)
+dataPerMov <-finalDataSet
+stepsForDayMean<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=mean)
+stepsForDayMedian<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=median)$x
+dataPerMovNA <- data.frame(DATE = stepsForDayMean$date,MEAN_STEP_NA = stepsForDayMean$x,MEDIAN_STEP_NA=stepsForDayMedian)
+
+#####################################################################
+#######CALCULATE
+#####################################################################
+library(stringr)
+dataPerMov<-read.csv("activity.csv")
+dataPerMov<-na.omit(dataPerMov)
+dataPerMov <- data.frame(date = dataPerMov$date,interval = dataPerMov$interval, steps = dataPerMov$steps)
+
+stepsForDayMean<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=mean)
+stepsForDayMedian<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=median)$x
+dataPerMov <- data.frame(DATE = stepsForDayMean$date,MEAN_STEP = stepsForDayMean$x,MEDIAN_STEP=stepsForDayMedian)
+
+res <- merge(dataPerMovNA,dataPerMov,all.x=TRUE, all.y = TRUE)
+res<-res[is.na(res$MEDIAN_STEP),]
+res
+```
+
+####Are there differences in activity patterns between weekdays and weekends?
+
+There´re some rows with any value, but this reason, we cant't calculat a value.
+
+```{r,echo=FALSE}
+#####################################################################
+#######CALCULATE VALUES NA
+#####################################################################
+
+#Load data
+dataPerMovRaw<-read.csv("activity.csv")
+auxData <- cbind(dataPerMovRaw,wday = as.POSIXlt(dataPerMovRaw$date)$wday)
+dataPerMov<-auxData[!is.na(auxData$steps),]
+dataPerMovNA <-auxData[is.na(auxData$steps),]
+
+#Calculation mean by interval and week day for the values NA
+dataPerMovMean<- aggregate(dataPerMov$steps, by=list(interval=dataPerMov$interval, wday=dataPerMov$wday), FUN=mean)
+names(dataPerMovMean) <- c("interval","wday","mean")
+
+#Building final data set
+tempAux <- merge(dataPerMovNA,dataPerMovMean)
+dataPerMovNA <- data.frame(steps = tempAux$mean, date = tempAux$date, interval = tempAux$interval, wday = tempAux$wday)
+finalDataSet <- rbind(dataPerMovNA,dataPerMov)
+dataPerMov <-finalDataSet
+stepsForDayMean<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=mean)
+stepsForDayMedian<- aggregate(dataPerMov$steps, by=list(date=dataPerMov$date), FUN=median)$x
+dataPerMovNA <- data.frame(DATE = stepsForDayMean$date,MEAN_STEP = stepsForDayMean$x,MEDIAN_STEP=stepsForDayMedian)
+
+```
 
 
+####Are there differences in activity patterns between weekdays and weekends?
+Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day
+```{r,echo=FALSE}
+#####################################################################
+#######CALCULATE VALUES NA
+#####################################################################
 
-## Are there differences in activity patterns between weekdays and weekends?
+#Load data
+dataPerMovRaw<-read.csv("activity.csv")
+auxData <- cbind(dataPerMovRaw,wday = as.POSIXlt(dataPerMovRaw$date)$wday)
+dataPerMov<-auxData[!is.na(auxData$steps),]
+dataPerMovNA <-auxData[is.na(auxData$steps),]
+
+#Calculation mean by interval and week day for the values NA
+dataPerMovMean<- aggregate(dataPerMov$steps, by=list(interval=dataPerMov$interval, wday=dataPerMov$wday), FUN=mean)
+names(dataPerMovMean) <- c("interval","wday","mean")
+
+#Building final data set
+tempAux <- merge(dataPerMovNA,dataPerMovMean)
+dataPerMovNA <- data.frame(steps = tempAux$mean, date = tempAux$date, interval = tempAux$interval, wday = tempAux$wday)
+finalDataSet <- rbind(dataPerMovNA,dataPerMov)
+
+auxFlag <- finalDataSet$wday==6 | finalDataSet$wday==0
+finalDataSet$wday[auxFlag] <- "weekend"
+finalDataSet$wday[!auxFlag] <- "weekday"
+head(finalDataSet,n=10)
+```
+
+Make a panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis)
+
+``` {r,echo=FALSE,fig.width=11, fig.height=4 }
+#####################################################################
+#######CALCULATE VALUES NA
+#####################################################################
+
+#Load data
+dataPerMovRaw<-read.csv("activity.csv")
+auxData <- cbind(dataPerMovRaw,wday = as.POSIXlt(dataPerMovRaw$date)$wday)
+dataPerMov<-auxData[!is.na(auxData$steps),]
+dataPerMovNA <-auxData[is.na(auxData$steps),]
+
+#Calculation mean by interval and week day for the values NA
+dataPerMovMean<- aggregate(dataPerMov$steps, by=list(interval=dataPerMov$interval, wday=dataPerMov$wday), FUN=mean)
+names(dataPerMovMean) <- c("interval","wday","mean")
+
+#Building final data set
+tempAux <- merge(dataPerMovNA,dataPerMovMean)
+dataPerMovNA <- data.frame(steps = tempAux$mean, date = tempAux$date, interval = tempAux$interval, wday = tempAux$wday)
+finalDataSet <- rbind(dataPerMovNA,dataPerMov)
+
+auxFlag <- finalDataSet$wday==6 | finalDataSet$wday==0
+finalDataSet$wday[auxFlag] <- "weekend"
+finalDataSet$wday[!auxFlag] <- "weekday"
+
+
+finalDataSet <-aggregate(finalDataSet$steps, by=list(interval=finalDataSet$interval, wday=finalDataSet$wday), FUN=mean)
+names(finalDataSet) <- c("interval"  ,"wday" , "mean")
+
+interval <- substr(as.character(seq(as.POSIXct("2015-02-12 00:00:00 CST"), as.POSIXct("2015-02-12 23:55:00 CST"), by = "hours")),12,16)
+longuitud <- nrow(finalDataSet) -1
+longuitudInterval <- length(interval)
+
+
+ggplot(finalDataSet,  aes(x=interval,  y=mean,  colour=wday,  group=wday)) +
+  geom_line() 
+```
